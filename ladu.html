@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>फाइल और फोटो मैनेजर</title>
+    <style>
+        /* --- CSS स्टाइल्स --- */
+        :root {
+            --primary-color: #4a90e2;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* शीर्ष हेडर और नेविगेशन */
+        header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #333;
+            margin: 0;
+        }
+
+        /* कंट्रोल बार (सर्च और अपलोड) */
+        .controls {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 800px;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+        }
+
+        #search-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .btn {
+            border: 1px solid var(--primary-color);
+            color: white;
+            background-color: var(--primary-color);
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #357abd;
+        }
+
+        /* असली फाइल इनपुट को छुपाएं */
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* गैलरी ग्रिड लेआउट */
+        .gallery-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .file-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .file-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .file-preview {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background-color: #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: #888;
+        }
+
+        .file-name {
+            font-size: 14px;
+            color: #555;
+            word-break: break-all;
+            margin-top: auto;
+            padding: 5px;
+        }
+
+        .file-type-badge {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .type-img { background-color: #e3f2fd; color: #1565c0; }
+        .type-pdf { background-color: #ffebee; color: #c62828; }
+
+        /* जब गैलरी खाली हो */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            color: #888;
+            padding: 50px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>📸 मीडिया और फ़ाइल गैलरी</h1>
+    
+    <div class="controls">
+        <input type="text" id="search-input" placeholder="फ़ाइल का नाम खोजें..." onkeyup="filterFiles()">
+        
+        <div class="upload-btn-wrapper">
+            <button class="btn">📤 फ़ाइल अपलोड करें</button>
+            <input type="file" id="file-upload" accept="image/*, application/pdf" multiple onchange="handleFileUpload(event)">
+        </div>
+    </div>
+</header>
+
+<main class="gallery-container" id="gallery">
+    <div class="empty-state">
+        <h3>कोई फ़ाइल नहीं है</h3>
+        <p>ऊपर दिए गए बटन से फोटो या पीडीएफ अपलोड करें।</p>
+    </div>
+</main>
+
+<script>
+    // --- JavaScript लॉजिक ---
+
+    const gallery = document.getElementById('gallery');
+    const searchInput = document.getElementById('search-input');
+    let filesData = []; // फाइलों का डेटा स्टोर करने के लिए लिस्ट
+
+    function handleFileUpload(event) {
+        const files = event.target.files;
+        const emptyState = document.querySelector('.empty-state');
+        
+        if (files.length > 0 && emptyState) {
+            emptyState.remove(); // खाली सन्देश हटा दें
+        }
+
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const fileItem = {
+                    name: file.name,
+                    type: file.type.startsWith('image/') ? 'image' : 'pdf',
+                    src: e.target.result, // यह बेस64 डेटा है
+                    element: null
+                };
+                
+                // कार्ड बनाएँ
+                createFileCard(fileItem);
+                filesData.push(fileItem);
+            };
+
+            // फाइल को पढ़ने के लिए (तस्वीर दिखाने के लिए)
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function createFileCard(fileItem) {
+        const card = document.createElement('div');
+        card.className = 'file-card';
+
+        // फाइल के प्रकार के अनुसार आइकॉन या फोटो सेट करें
+        let previewContent;
+        let badgeClass;
+        let badgeText;
+
+        if (fileItem.type === 'image') {
+            previewContent = `<img src="${fileItem.src}" class="file-preview" alt="${fileItem.name}">`;
+            badgeClass = 'type-img';
+            badgeText = 'PHOTO';
+        } else {
+            // PDF के लिए एक आइकॉन दिखाएं
+            previewContent = `<div class="file-preview">📄</div>`;
+            badgeClass = 'type-pdf';
+            badgeText = 'PDF';
+        }
+
+        card.innerHTML = `
+            ${previewContent}
+            <span class="file-type-badge ${badgeClass}">${badgeText}</span>
+            <div class="file-name">${fileItem.name}</div>
+        `;
+
+        gallery.appendChild(card);
+        fileItem.element = card; // सर्च के लिए रेफरेंस सेव करें
+    }
+
+    // सर्च फंक्शन (फिल्टर)
+    function filterFiles() {
+        const query = searchInput.value.toLowerCase();
+
+        filesData.forEach(item => {
+            const fileName = item.name.toLowerCase();
+            if (fileName.includes(query)) {
+                item.element.style.display = "flex"; // दिखाएं
+            } else {
+                item.element.style.display = "none"; // छुपाएं
+            }
+        });
+    }
+</script>
+
+</body>
+  </html>
